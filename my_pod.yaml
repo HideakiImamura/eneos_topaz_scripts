@@ -1,0 +1,120 @@
+apiVersion: v1
+data:
+  git-commit: ""
+  git-ghost-diff-hash: ""
+  git-ghost-prefix: ""
+  git-ghost-repo: ""
+  git-repo: ""
+kind: ConfigMap
+metadata:
+  labels:
+    pfkube: "true"
+    pfkube-job-name: topaz-optuna-policy
+    pfkube-job-uid: ca8f6d56d9c96fa3dce75dfb202aaa348940f9ed5ffb063c53241dbab3e8997
+    pfkube-package: pod
+    pfkube-package-version: 0.12.0
+  name: topaz-optuna-policy-git-sync-param
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: topaz-optuna-policy
+  annotations:
+    k8s.pfn.io/inject-git-ssh-command: ""
+    k8s.pfn.io/secret-name-for-git-ssh-command: pfkube-git-secret
+    kubectl.kubernetes.io/default-logs-container: container
+  labels:
+    pfkube: "true"
+    pfkube-job-name: gifted-bhabha
+    pfkube-job-uid: ca8f6d56d9c96fa3dce75dfb202aaa348940f9ed5ffb063c53241dbab3e8997
+    pfkube-package: pod
+    pfkube-package-version: 0.12.0
+spec:
+  containers:
+  - name: topaz-optuna-policy
+    image: harbor.mnj.pfn.io/user-mamu/topaz:latest
+    command:
+    - bash
+    - -c
+    - cd /mnt/vol21/mamu/eneos_topaz/topaz
+      && poetry config virtualenvs.create false --local
+      && poetry install -E train
+      && pip list
+      && poetry run python scripts/evaluation/planning_backtest/cost_force_plot.py --task local --config config.yaml 
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+        memory: "32Gi"
+        cpu: 4
+      requests:
+        nvidia.com/gpu: 1
+        memory: "32Gi"
+        cpu: 4
+    args:
+    - sleep
+    - infinity
+    env:
+    - name: OMP_NUM_THREADS
+      valueFrom:
+        resourceFieldRef:
+          containerName: container
+          resource: requests.cpu
+    - name: TINI_SUBREAPER
+      value: ""
+    - name: PFKUBE_JOB_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.labels['pfkube-job-name']
+    - name: PFKUBE_PACKAGE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.labels['pfkube-package']
+    - name: PFKUBE_PACKAGE_VERSION
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.labels['pfkube-package-version']
+    #image: harbor.mnj.pfn.io/cluster-services-public/all-in-one:v0.5.1-cuda11.0
+    name: container
+    volumeMounts:
+    - mountPath: /dev/shm
+      name: dshm
+    - mountPath: /mnt/vol21
+      name: vol21
+    - mountPath: /mnt/nfs-mnj-hot-01
+      name: nfs-mnj-hot-01
+    - mountPath: /mnt/nfs-mnj-hot-02
+      name: nfs-mnj-hot-02
+    - mountPath: /mnt/nfs-mnj-archive-02
+      name: nfs-mnj-archive-02
+    - mountPath: /mnt/nfs-mnj-archive-03
+      name: nfs-mnj-archive-03
+    - mountPath: /mnt/nvme0n1/scratch
+      name: local-scratch
+  imagePullSecrets:
+  - name: pfkube-harbor-cred
+  - name: harbor-cred
+  priorityClassName: low
+  restartPolicy: Never
+  volumes:
+  - emptyDir:
+      medium: Memory
+      sizeLimit: 1024Mi
+    name: dshm
+  - hostPath:
+      path: /mnt/vol21
+    name: vol21
+  - hostPath:
+      path: /mnt/nfs-mnj-hot-01
+    name: nfs-mnj-hot-01
+  - hostPath:
+      path: /mnt/nfs-mnj-hot-02
+    name: nfs-mnj-hot-02
+  - hostPath:
+      path: /mnt/nfs-mnj-archive-02
+    name: nfs-mnj-archive-02
+  - hostPath:
+      path: /mnt/nfs-mnj-archive-03
+    name: nfs-mnj-archive-03
+  - hostPath:
+      path: /mnt/nvme0n1/scratch
+    name: local-scratch
